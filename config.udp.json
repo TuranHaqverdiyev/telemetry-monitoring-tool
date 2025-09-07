@@ -1,0 +1,45 @@
+{
+  "sources": [
+    {
+      "type": "udp",
+      "name": "udp_telemetry",
+      "host": "127.0.0.1",
+      "port": 9999
+    }
+  ],
+  "channels": [
+    {
+      "name": "temp_c",
+      "unit": "°C",
+      "min": -10.0,
+      "max": 50.0
+    },
+    {
+      "name": "voltage", 
+      "unit": "V",
+      "min": 2.5,
+      "max": 4.0
+    },
+    {
+      "name": "current",
+      "unit": "A", 
+      "min": 0.5,
+      "max": 2.0
+    }
+  ],
+  "rate_hz": 5.0,
+  "window_sec": 50,
+  "group_by_source": false,
+  "detector_selection_mode": "first",
+  "default_detectors": [
+    {
+      "method": "zscore",
+      "enabled": true,
+      "parameters": {
+        "z_threshold": 3.0,
+        "alpha": 0.1,
+        "eps": 1e-6
+      }
+    }
+  ]
+}

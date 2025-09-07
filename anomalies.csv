@@ -1,0 +1,5 @@
+ts,channel,value,z,mean,std,detector_method,anomaly_score,explanation_summary
+1757261334.0311208,udp_telemetry:current,1.084645442217928,10.0,1.0285296544043676,0.017572522296957525,EWMA-ZScore-current: ANOMALY,1.0,Z-score 3.19 exceeds threshold ±3.0
+1757261334.432023,udp_telemetry:current,1.0831933262380322,10.0,1.0279405564824289,0.017329010073165313,EWMA-ZScore-current: ANOMALY,1.0,Z-score 3.19 exceeds threshold ±3.0
+1757261334.633208,udp_telemetry:current,1.091268006270741,10.0,1.0279405564824289,0.017329010073165313,EWMA-ZScore-current: ANOMALY,1.0,Z-score 3.65 exceeds threshold ±3.0
+1757261335.0342486,udp_telemetry:current,1.0965746549657251,10.0,1.0269874536929386,0.017419757723824824,EWMA-ZScore-current: ANOMALY,1.0,Z-score 3.99 exceeds threshold ±3.0

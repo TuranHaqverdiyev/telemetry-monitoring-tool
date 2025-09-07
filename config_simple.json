@@ -1,0 +1,32 @@
+{
+  "rate_hz": 5.0,
+  "detector": {
+    "alpha": 0.1,
+    "z_threshold": 3.0
+  },
+  "channels": [
+    {
+      "name": "temp_c",
+      "unit": "°C",
+      "min": 0,
+      "max": 100,
+      "group": "Environmental"
+    },
+    {
+      "name": "voltage",
+      "unit": "V",
+      "min": 0,
+      "max": 5,
+      "group": "Power"
+    },
+    {
+      "name": "current",
+      "unit": "A",
+      "min": 0,
+      "max": 3,
+      "group": "Power"
+    }
+  ],
+  "window_sec": 100,
+  "group_by_source": false
+}

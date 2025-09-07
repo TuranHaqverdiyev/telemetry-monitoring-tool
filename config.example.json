@@ -1,0 +1,9 @@
+{
+  "rate_hz": 5,
+  "detector": { "alpha": 0.05, "z_threshold": 3.0 },
+  "channels": [
+    { "name": "battery_v", "unit": "V", "min": 20.0, "max": 32.0, "group": "power", "breach": { "direction": "below", "threshold": 24.0 } },
+    { "name": "temp_c", "unit": "C", "min": -40.0, "max": 85.0, "group": "thermal", "breach": { "direction": "above", "threshold": 60.0 } },
+    { "name": "gyro_x", "unit": "deg_s", "min": -5.0, "max": 5.0, "group": "attitude" }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "data_sources": [
+    {
+      "type": "simulator",
+      "name": "internal_sim",
+      "enabled": true,
+      "simulator_config": {
+        "freq_hz": 1.0,
+        "channels": ["sim:temp_c", "sim:voltage", "sim:current"],
+        "initial_values": [20.0, 3.3, 1.0],
+        "trends": [0.1, 0.01, 0.005],
+        "noise_std": [2.0, 0.1, 0.05],
+        "anomaly_rate": 0.02,
+        "anomaly_magnitude": [5.0, 0.5, 0.2]
+      }
+    }
+  ],
+  "default_detectors": [
+    {
+      "method": "zscore",
+      "enabled": true,
+      "parameters": {
+        "z_threshold": 3.0,
+        "alpha": 0.1,
+        "eps": 1e-6
+      }
+    },
+    {
+      "method": "iqr",
+      "enabled": true,
+      "parameters": {
+        "iqr_multiplier": 2.0,
+        "window_size": 50
+      }
+    },
+    {
+      "method": "isolation-forest",
+      "enabled": true,
+      "parameters": {
+        "contamination": 0.1,
+        "n_estimators": 100,
+        "window_size": 100,
+        "min_samples": 50,
+        "retrain_interval": 20,
+        "anomaly_threshold": -0.5
+      }
+    },
+    {
+      "method": "modified-zscore",
+      "enabled": true,
+      "parameters": {
+        "mad_threshold": 3.5,
+        "window_size": 100,
+        "min_samples": 10
+      }
+    }
+  ],
+  "detector_selection_mode": "majority",
+  "gui_config": {
+    "update_interval_ms": 100,
+    "max_plot_points": 1000,
+    "desktop_notifications": true
+  },
+  "forecast_config": {
+    "enabled": true,
+    "auto_mode": true,
+    "model": "sarima",
+    "forecast_periods": 10,
+    "confidence_level": 0.95,
+    "min_data_points": 30
+  },
+  "channels": [
+    {
+      "name": "sim:temp_c",
+      "forecast_threshold": {
+        "enabled": true,
+        "direction": "above",
+        "value": 25.0
+      },
+      "detectors": [
+        {
+          "method": "zscore",
+          "enabled": true,
+          "parameters": {
+            "z_threshold": 2.5
+          }
+        },
+        {
+          "method": "iqr",
+          "enabled": true,
+          "parameters": {
+            "iqr_multiplier": 1.8
+          }
+        },
+        {
+          "method": "isolation-forest",
+          "enabled": true,
+          "parameters": {
+            "contamination": 0.05,
+            "n_estimators": 200,
+            "window_size": 150,
+            "min_samples": 30,
+            "anomaly_threshold": -0.4
+          }
+        },
+        {
+          "method": "modified-zscore",
+          "enabled": true,
+          "parameters": {
+            "mad_threshold": 3.0,
+            "window_size": 120
+          }
+        }
+      ]
+    },
+    {
+      "name": "sim:voltage",
+      "forecast_threshold": {
+        "enabled": true,
+        "direction": "above",
+        "value": 3.4
+      },
+      "detectors": [
+        {
+          "method": "zscore",
+          "enabled": true,
+          "parameters": {
+            "z_threshold": 3.0
+          }
+        },
+        {
+          "method": "iqr",
+          "enabled": true,
+          "parameters": {
+            "iqr_multiplier": 2.2
+          }
+        },
+        {
+          "method": "isolation-forest",
+          "enabled": true,
+          "parameters": {
+            "contamination": 0.08,
+            "n_estimators": 150
+          }
+        },
+        {
+          "method": "modified-zscore",
+          "enabled": true,
+          "parameters": {
+            "mad_threshold": 3.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "sim:current",
+      "forecast_threshold": {
+        "enabled": true,
+        "direction": "above", 
+        "value": 1.2
+      },
+      "detectors": [
+        {
+          "method": "zscore",
+          "enabled": true,
+          "parameters": {
+            "z_threshold": 2.8
+          }
+        },
+        {
+          "method": "iqr",
+          "enabled": true,
+          "parameters": {
+            "iqr_multiplier": 2.0
+          }
+        },
+        {
+          "method": "isolation-forest",
+          "enabled": true,
+          "parameters": {
+            "contamination": 0.12,
+            "n_estimators": 80,
+            "anomaly_threshold": -0.6
+          }
+        },
+        {
+          "method": "modified-zscore",
+          "enabled": true,
+          "parameters": {
+            "mad_threshold": 3.8,
+            "window_size": 80
+          }
+        }
+      ]
+    }
+  ]
+}

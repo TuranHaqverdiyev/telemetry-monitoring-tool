@@ -1,0 +1,41 @@
+{
+  "rate_hz": 5.0,
+  "detector": {
+    "alpha": 0.001,
+    "z_threshold": 3.3
+  },
+  "channels": [
+    {
+      "name": "temp_c",
+      "unit": "°C",
+      "min": 0,
+      "max": 100,
+      "breach": {
+        "threshold": 25.0,
+        "direction": "above"
+      }
+    },
+    {
+      "name": "voltage",
+      "unit": "V",
+      "min": 0,
+      "max": 5,
+      "breach": {
+        "threshold": 3.4,
+        "direction": "above"
+      }
+    },
+    {
+      "name": "current",
+      "unit": "A",
+      "min": 0,
+      "max": 3,
+      "breach": {
+        "threshold": 1.2,
+        "direction": "above"
+      }
+    }
+  ],
+  "window_sec": 100,
+  "group_by_source": false
+}

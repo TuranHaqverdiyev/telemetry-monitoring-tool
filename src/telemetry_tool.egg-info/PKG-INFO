@@ -1,0 +1,92 @@
+Metadata-Version: 2.4
+Name: telemetry-tool
+Version: 0.1.0
+Summary: Satellite telemetry monitoring: streaming anomaly detection and forecasting
+Author: You
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: pandas>=2.2
+Requires-Dist: statsmodels>=0.14
+Requires-Dist: typer>=0.12
+
+# Satellite Telemetry Monitoring Tool
+
+A minimal, local-first project to analyze satellite telemetry with:
+- Real-time anomaly detection (streaming, low-latency)
+- Future trend analysis and simple failure prediction (forecasting)
+- A telemetry simulator to iterate without hardware/ground-link
+
+## What you need to know (quick guide)
+- Telemetry basics: sampling rate, units, valid ranges, calibration, missing data handling.
+- Anomaly types: spikes, drifts, stuck sensors, saturation, seasonality changes, dropouts.
+- Streaming detection: compute smoothed baseline and deviation per channel; alert when deviation is unlikely.
+- Forecasting: fit a simple model on recent history (Holt-Winters). Predict if/when thresholds will be breached.
+- Operations: thresholds, alert routing, deduplication, escalation, post-mortems, model retraining.
+
+## Project structure
+- `src/telemetry/simulator.py` — synthetic telemetry stream
+- `src/telemetry/anomaly.py` — streaming anomaly detectors
+- `src/telemetry/forecast.py` — Holt-Winters forecasting and risk estimates
+- `src/telemetry/stream_app.py` — example: simulate, detect anomalies, forecast
+- `tests/` — quick unit tests for core logic
+
+## Install
+Create a virtual environment and install dependencies.
+
+```powershell
+python -m venv .venv
+. .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+## Try it
+Run the streaming demo for 30 seconds at ~5 Hz on a few channels.
+
+```powershell
+python -m src.telemetry.stream_app --rate-hz 5 --duration-sec 30 --channels battery_v,temp_c,gyro_x
+```
+
+You’ll see anomaly flags and a periodic forecast summary with a rough “time-to-threshold” estimate when relevant.
+
+### Use a JSON config
+Copy `config.example.json` to `config.json` and tweak values, then:
+
+```powershell
+python -m src.telemetry.stream_app --duration-sec 30 --config config.json
+```
+
+## Adapting to real telemetry
+## Desktop GUI
+
+Install GUI deps and launch the app:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m src.gui.main
+```
+
+Plot grouping: add `group` on channels in `config.json` to plot related telemetry together (e.g., power/thermal/attitude). If no groups are set, each channel appears on its own panel.
+
+To package as a Windows .exe later:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install pyinstaller
+.\.venv\Scripts\pyinstaller --noconfirm --onefile --name telemetry-gui src\gui\main.py
+```
+
+- Replace the simulator with your input: socket, serial, file tail, message bus (e.g., Kafka/MQTT).
+- Map incoming packets to a schema: timestamp + channel values (float/int).
+- Configure per-channel thresholds and detection parameters.
+- Persist raw + alerts (CSV/Parquet/DB) and expose alerts via your ops tools.
+
+## Next steps
+- Add a proper API and dashboard (FastAPI + a simple web UI or Grafana/Prometheus).
+- Add multivariate detectors (IsolationForest, Mahalanobis, or river for online learning).
+- Handle seasonality explicitly (STL or state-space models) if needed.
+- Model governance: versioning, drift monitoring, backtesting.
+
+---
+
+If you need help wiring to your real feed, share a sample record format and we’ll plug it in.
