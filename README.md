@@ -322,26 +322,3 @@ This project implements a complete multi-method anomaly detection pipeline. Key 
 2. **Advanced Ensemble**: Meta-learning and weighted voting
 3. **Real-time Adaptation**: Online learning and drift detection
 4. **API Integration**: REST API for external system integration
-
----
-
-## 📄 **License**
-
-This project is available under standard software licensing terms. See project documentation for details.
-
----
-
-**🏆 Status**: Production Ready - All 4 core detection methods implemented and tested
-=====================================================================================
-
-# telemetry-monitoring-tool
-
-A Python-based telemetry monitoring tool for real-time anomaly detection, forecasting, and visualization.
-
->>>>>>> 65333692cf2a8beee0bbc630eeac4d7e3a43a0b4
->>>>>>>
->>>>>>
->>>>>
->>>>
->>>
->>
