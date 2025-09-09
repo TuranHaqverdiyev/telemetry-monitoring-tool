@@ -6,12 +6,32 @@
       "enabled": true,
       "simulator_config": {
         "freq_hz": 1.0,
-        "channels": ["sim:temp_c", "sim:voltage", "sim:current"],
-        "initial_values": [20.0, 3.3, 1.0],
-        "trends": [0.1, 0.01, 0.005],
-        "noise_std": [2.0, 0.1, 0.05],
-        "anomaly_rate": 0.02,
-        "anomaly_magnitude": [5.0, 0.5, 0.2]
+        "channels": [
+          "sim:temp_c",
+          "sim:voltage",
+          "sim:current"
+        ],
+        "initial_values": [
+          20.0,
+          3.3,
+          1.0
+        ],
+        "trends": [
+          0.1,
+          0.01,
+          0.005
+        ],
+        "noise_std": [
+          2.0,
+          0.1,
+          0.05
+        ],
+        "anomaly_rate": 0.15,
+        "anomaly_magnitude": [
+          5.0,
+          0.5,
+          0.2
+        ]
       }
     }
   ],
@@ -22,7 +42,7 @@
       "parameters": {
         "z_threshold": 3.0,
         "alpha": 0.1,
-        "eps": 1e-6
+        "eps": 1e-06
       }
     },
     {
@@ -156,7 +176,7 @@
       "name": "sim:current",
       "forecast_threshold": {
         "enabled": true,
-        "direction": "above", 
+        "direction": "above",
         "value": 1.2
       },
       "detectors": [
@@ -193,5 +213,43 @@
         }
       ]
     }
-  ]
+  ],
+  "alerts": {
+    "enabled": true,
+    "email": {
+      "smtp_server": "smtp.gmail.com",
+      "smtp_port": 587,
+      "use_tls": true,
+      "username": "demodata93@gmail.com",
+      "password": "vhylwagyfynchbgc",
+      "from_email": "demodata93@gmail.com"
+    },
+    "recipients": {
+      "critical": [
+        "demo.turanrh@gmail.com",
+        "test-gui-sync@example.com",
+        "new-user@example.com"
+      ],
+      "high": [
+        "demo.turanrh@gmail.com"
+      ],
+      "medium": [
+        "demo.turanrh@gmail.com"
+      ],
+      "low": [
+        "demo.turanrh@gmail.com"
+      ]
+    },
+    "rate_limiting": {
+      "max_alerts_per_hour": 10,
+      "cooldown_minutes": 5,
+      "batch_window_minutes": 15
+    },
+    "templates": {
+      "subject_prefix": "[TELEMETRY ALERT]",
+      "include_charts": false,
+      "include_raw_data": false,
+      "company_name": "Telemetry Monitoring"
+    }
+  }
 }

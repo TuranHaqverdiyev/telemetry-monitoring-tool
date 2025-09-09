@@ -5,13 +5,13 @@ from typing import Dict, List, Optional, Any
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot  # type: ignore
 
-from src.telemetry.simulator import TelemetrySimulator
-from src.telemetry.anomaly import EWMAZScoreDetector, RangeGuard
-from src.telemetry.iqr_detector import DetectorFactory
-from src.telemetry.detector_base import AnomalyDetector, AnomalyResult
-from src.telemetry.forecast import make_forecast_summary
-from src.telemetry.model import assess
-from .config import AppConfig, DetectorConfig
+from telemetry.simulator import TelemetrySimulator
+from telemetry.anomaly import EWMAZScoreDetector, RangeGuard
+from telemetry.iqr_detector import DetectorFactory
+from telemetry.detector_base import AnomalyDetector, AnomalyResult
+from telemetry.forecast import make_forecast_summary
+from telemetry.model import assess
+from gui.config import AppConfig, DetectorConfig
 from pathlib import Path
 import csv
 from src.ingest.sources import file_tail, udp_json_stream

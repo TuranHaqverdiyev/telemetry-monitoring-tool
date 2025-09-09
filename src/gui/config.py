@@ -5,6 +5,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+# Import alert configuration
+try:
+    from alerts.alert_config import AlertConfig
+except ImportError:
+    # Fallback if alerts module not available
+    AlertConfig = None
+
 
 @dataclass
 class DetectorConfig:
@@ -40,6 +47,9 @@ class AppConfig:
     # New multi-method detector configuration
     default_detectors: List[DetectorConfig] = field(default_factory=list)
     detector_selection_mode: str = "first"  # "first", "majority", "any", "all"
+    
+    # Alert system configuration
+    alerts: Optional[Any] = None  # Will be AlertConfig if available
 
 
 def load_config(path: str) -> AppConfig:
@@ -161,6 +171,14 @@ def load_config(path: str) -> AppConfig:
     group_by_source = bool(data.get("group_by_source", False))
     sources = list(data.get("sources", data.get("data_sources", [])))
     
+    # Load alert configuration
+    alerts = None
+    if AlertConfig and "alerts" in data:
+        try:
+            alerts = AlertConfig.from_dict(data["alerts"])
+        except Exception as e:
+            print(f"Warning: Failed to load alert configuration: {e}")
+    
     return AppConfig(
         rate_hz=rate_hz,
         alpha=alpha,
@@ -171,7 +189,8 @@ def load_config(path: str) -> AppConfig:
         sources=sources,
         groups=groups,
         default_detectors=default_detectors,
-        detector_selection_mode=detector_selection_mode
+        detector_selection_mode=detector_selection_mode,
+        alerts=alerts
     )
 
 

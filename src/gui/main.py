@@ -24,12 +24,13 @@ from PySide6.QtCore import QThread, QSettings, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QSystemTrayIcon
 
-from .config import load_config
-from .service import StreamWorker, AnomalyEvent
-from .widgets.plots import PlotGrid
-from .widgets.anomalies import AnomalyTable
-from .widgets.forecasts import ForecastTable
-from .widgets.detector_control import DetectorControlPanel
+from gui.config import load_config
+from gui.service import StreamWorker, AnomalyEvent
+from gui.widgets.plots import PlotGrid
+from gui.widgets.anomalies import AnomalyTable
+from gui.widgets.forecasts import ForecastTable
+from gui.widgets.detector_control import DetectorControlPanel
+from gui.widgets.alert_config import AlertConfigWidget
 
 # Optional dark theme
 try:
@@ -53,6 +54,16 @@ class MainWindow(QMainWindow):
             
         self.cfg = load_config(str(self.cfg_path))
 
+        # Initialize alert manager
+        self.alert_manager = None
+        if hasattr(self.cfg, 'alerts') and self.cfg.alerts:
+            try:
+                from alerts.alert_manager import AlertManager
+                self.alert_manager = AlertManager(self.cfg.alerts)
+                print(f"📧 Alert system initialized (enabled: {self.cfg.alerts.enabled})")
+            except ImportError as e:
+                print(f"Warning: Could not initialize alert system: {e}")
+
         # UI widgets
         # No initial plots - user creates them on demand with "Add Plot" button
         self.plot = None
@@ -71,6 +82,15 @@ class MainWindow(QMainWindow):
             channels_config, 
             getattr(self.cfg, 'detector_selection_mode', 'first')
         )
+        
+        # Alert configuration panel
+        self.alert_config_widget = AlertConfigWidget(config_path=str(self.cfg_path))
+        if hasattr(self.cfg, 'alerts') and self.cfg.alerts:
+            self.alert_config_widget.set_config(self.cfg.alerts)
+        
+        # Connect alert manager to alert config widget
+        if self.alert_manager:
+            self.alert_config_widget.set_alert_manager(self.alert_manager)
 
         # Buttons and controls
         self.btn_start = QPushButton("Start")
@@ -156,6 +176,7 @@ class MainWindow(QMainWindow):
         
         right_tabs.addTab(controls_widget, "📊 Controls")
         right_tabs.addTab(self.detector_panel, "🔧 Detectors")
+        right_tabs.addTab(self.alert_config_widget, "📧 Alerts")
 
         # Create a horizontal splitter for resizable layout
         central_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -300,6 +321,22 @@ class MainWindow(QMainWindow):
                     float(pvalue) if pvalue is not None else 0.0,
                     float(eta_sec) if eta_sec is not None else 0.0,
                 )
+                
+                # Send email alert if alert manager is enabled
+                if self.alert_manager and self.alert_manager.config.enabled:
+                    try:
+                        self.alert_manager.send_alert(
+                            channel=str(ev.get("channel", "")),
+                            value=float(ev.get("value", 0.0)),
+                            timestamp=float(ev.get("ts", 0.0)),
+                            severity=str(ev.get("severity", "medium")),
+                            detector_method=str(ev.get("detector_method", "unknown")),
+                            anomaly_score=float(ev.get("anomaly_score", 0.0)),
+                            explanation=ev.get("explanation_summary"),
+                            raw_data=ev.get("raw_data", {})
+                        )
+                    except Exception as e:
+                        print(f"Warning: Failed to send email alert: {e}")
                 
                 # Desktop notification for critical severity
                 try:

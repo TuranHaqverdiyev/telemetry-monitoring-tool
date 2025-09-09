@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont
 
-from ..config import DetectorConfig
-from ...telemetry.detector_base import DetectorFactory
+from gui.config import DetectorConfig
+from telemetry.detector_base import DetectorFactory
 
 
 class DetectorParameterWidget(QWidget):
