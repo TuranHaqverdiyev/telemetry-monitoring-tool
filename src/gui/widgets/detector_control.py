@@ -250,6 +250,145 @@ class ChannelDetectorWidget(QWidget):
                 param_widget.update_parameter(param_name, value)
 
 
+class GlobalDetectorWidget(QWidget):
+    """Widget for managing detectors globally across all channels."""
+    
+    detector_enabled = Signal(str, str, bool)  # channel, method, enabled (will emit for all channels)
+    detector_parameter_changed = Signal(str, str, str, object)  # channel, method, param, value (will emit for all channels)
+    selection_mode_changed = Signal(str, str)  # channel, mode (will emit for all channels)
+    
+    def __init__(self, channels_list: List[str], detector_configs: List[DetectorConfig], 
+                 default_selection_mode: str = "first", parent=None):
+        super().__init__(parent)
+        self.channels_list = channels_list
+        self.detector_configs = {config.method: config for config in detector_configs}
+        self.default_selection_mode = default_selection_mode
+        self.detector_widgets = {}
+        self.param_widgets = {}
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Header
+        header = QLabel("🌐 Global Detector Configuration (All Sensors)")
+        header_font = QFont()
+        header_font.setBold(True)
+        header_font.setPointSize(11)
+        header.setFont(header_font)
+        header.setStyleSheet("color: #2E86C1; margin: 10px 0px;")
+        layout.addWidget(header)
+        
+        # Selection mode
+        mode_group = QGroupBox("Combination Mode")
+        mode_layout = QHBoxLayout(mode_group)
+        
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["first", "majority", "any"])
+        self.mode_combo.setCurrentText(self.default_selection_mode)
+        self.mode_combo.currentTextChanged.connect(self._on_selection_mode_changed)
+        mode_layout.addWidget(QLabel("Selection mode:"))
+        mode_layout.addWidget(self.mode_combo)
+        mode_layout.addStretch()
+        
+        layout.addWidget(mode_group)
+        
+        # Detector methods
+        detector_group = QGroupBox("Detection Methods")
+        detector_layout = QVBoxLayout(detector_group)
+        
+        # Get available methods (filter to primary names only)
+        available_methods = DetectorFactory.get_available_methods()
+        primary_methods = [m for m in available_methods if m in ["zscore", "iqr", "isolation-forest", "modified-zscore"]]
+        
+        for method in primary_methods:
+            # Method section
+            method_frame = QFrame()
+            method_frame.setFrameStyle(QFrame.Shape.Box)
+            method_frame.setStyleSheet("QFrame { border: 1px solid #BDC3C7; border-radius: 5px; margin: 2px; }")
+            method_layout = QVBoxLayout(method_frame)
+            
+            # Method header with enable checkbox
+            header_layout = QHBoxLayout()
+            
+            enable_checkbox = QCheckBox(f"Enable {method.upper()}")
+            enable_checkbox.setStyleSheet("font-weight: bold;")
+            config = self.detector_configs.get(method)
+            if config:
+                enable_checkbox.setChecked(config.enabled)
+            
+            enable_checkbox.toggled.connect(
+                lambda checked, m=method: self._on_detector_enabled(m, checked)
+            )
+            
+            self.detector_widgets[method] = enable_checkbox
+            header_layout.addWidget(enable_checkbox)
+            header_layout.addStretch()
+            
+            method_layout.addLayout(header_layout)
+            
+            # Parameters
+            if config and config.parameters:
+                param_widget = DetectorParameterWidget(method, config.parameters)
+                param_widget.parameter_changed.connect(
+                    lambda m, p, v: self._on_parameter_changed(m, p, v)
+                )
+                method_layout.addWidget(param_widget)
+                self.param_widgets[method] = param_widget
+            else:
+                # Create default parameters
+                defaults = self._get_default_parameters(method)
+                if defaults:
+                    param_widget = DetectorParameterWidget(method, defaults)
+                    param_widget.parameter_changed.connect(
+                        lambda m, p, v: self._on_parameter_changed(m, p, v)
+                    )
+                    method_layout.addWidget(param_widget)
+                    self.param_widgets[method] = param_widget
+            
+            detector_layout.addWidget(method_frame)
+        
+        layout.addWidget(detector_group)
+        layout.addStretch()
+        
+    def _on_detector_enabled(self, method: str, enabled: bool):
+        """Handle detector enable/disable - emit for all channels."""
+        for channel in self.channels_list:
+            self.detector_enabled.emit(channel, method, enabled)
+    
+    def _on_parameter_changed(self, method: str, param: str, value):
+        """Handle parameter change - emit for all channels.""" 
+        for channel in self.channels_list:
+            self.detector_parameter_changed.emit(channel, method, param, value)
+    
+    def _on_selection_mode_changed(self, mode: str):
+        """Handle selection mode change - emit for all channels."""
+        for channel in self.channels_list:
+            self.selection_mode_changed.emit(channel, mode)
+    
+    def _get_default_parameters(self, method: str) -> Dict[str, Any]:
+        """Get default parameters for a detector method."""
+        defaults = {
+            "zscore": {"z_threshold": 2.5},
+            "iqr": {"iqr_multiplier": 1.5}, 
+            "isolation-forest": {"contamination": 0.1, "n_estimators": 100, "window_size": 100, "min_samples": 20},
+            "modified-zscore": {"mad_threshold": 3.5, "window_size": 100}
+        }
+        return defaults.get(method, {})
+    
+    def update_detector_config(self, method: str, config: DetectorConfig):
+        """Update configuration for a detector method."""
+        self.detector_configs[method] = config
+        
+        if method in self.detector_widgets:
+            self.detector_widgets[method].setChecked(config.enabled)
+        
+        if method in self.param_widgets and config.parameters:
+            for param_name, value in config.parameters.items():
+                self.param_widgets[method].update_parameter(param_name, value)
+
+
 class DetectorControlPanel(QWidget):
     """Main control panel for detector method selection."""
     
@@ -263,11 +402,15 @@ class DetectorControlPanel(QWidget):
         super().__init__(parent)
         self.channels_config = channels_config
         self.default_selection_mode = default_selection_mode
-        self.channel_widgets = {}
+        self.channels_list = list(channels_config.keys())
         
-        self.setup_ui()
+        # Get the first channel's config as the base for global config
+        first_channel_configs = next(iter(channels_config.values())) if channels_config else []
+        self.global_detector_widget = None
         
-    def setup_ui(self):
+        self.setup_ui(first_channel_configs)
+        
+    def setup_ui(self, detector_configs: List[DetectorConfig]):
         layout = QVBoxLayout(self)
         
         # Title
@@ -278,74 +421,78 @@ class DetectorControlPanel(QWidget):
         title.setFont(title_font)
         layout.addWidget(title)
         
-        # Global controls
-        global_group = QGroupBox("Global Controls")
-        global_layout = QVBoxLayout(global_group)
-        
-        # Apply to all channels buttons
-        apply_layout = QHBoxLayout()
-        apply_layout.addWidget(QLabel("Apply to all channels:"))
+        # Quick action buttons
+        quick_actions = QGroupBox("Quick Actions")
+        actions_layout = QHBoxLayout(quick_actions)
         
         self.btn_enable_zscore = QPushButton("Enable Z-Score")
         self.btn_enable_zscore.clicked.connect(
-            lambda: self.apply_to_all_channels.emit("zscore", True)
+            lambda: self._enable_method_for_all("zscore")
         )
-        apply_layout.addWidget(self.btn_enable_zscore)
+        actions_layout.addWidget(self.btn_enable_zscore)
         
         self.btn_enable_iqr = QPushButton("Enable IQR")
         self.btn_enable_iqr.clicked.connect(
-            lambda: self.apply_to_all_channels.emit("iqr", True)
+            lambda: self._enable_method_for_all("iqr")
         )
-        apply_layout.addWidget(self.btn_enable_iqr)
+        actions_layout.addWidget(self.btn_enable_iqr)
+        
+        self.btn_enable_isolation = QPushButton("Enable Isolation Forest")
+        self.btn_enable_isolation.clicked.connect(
+            lambda: self._enable_method_for_all("isolation-forest")
+        )
+        actions_layout.addWidget(self.btn_enable_isolation)
         
         self.btn_disable_all = QPushButton("Disable All")
         self.btn_disable_all.clicked.connect(self._disable_all_detectors)
-        apply_layout.addWidget(self.btn_disable_all)
+        actions_layout.addWidget(self.btn_disable_all)
         
-        apply_layout.addStretch()
-        global_layout.addLayout(apply_layout)
-        layout.addWidget(global_group)
+        actions_layout.addStretch()
+        layout.addWidget(quick_actions)
         
-        # Channel-specific controls in tabs
-        self.tab_widget = QTabWidget()
+        # Global detector configuration
+        self.global_detector_widget = GlobalDetectorWidget(
+            self.channels_list,
+            detector_configs,
+            self.default_selection_mode
+        )
         
-        for channel_name, detector_configs in self.channels_config.items():
-            channel_widget = ChannelDetectorWidget(
-                channel_name, 
-                detector_configs,
-                self.default_selection_mode
-            )
-            
-            # Connect signals
-            channel_widget.detector_enabled.connect(self.detector_enabled.emit)
-            channel_widget.detector_parameter_changed.connect(self.detector_parameter_changed.emit)
-            channel_widget.selection_mode_changed.connect(
-                lambda mode, ch=channel_name: self.selection_mode_changed.emit(ch, mode)
-            )
-            
-            # Wrap in scroll area for long parameter lists
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setWidget(channel_widget)
-            scroll.setFrameStyle(QFrame.Shape.NoFrame)
-            
-            self.tab_widget.addTab(scroll, channel_name)
-            self.channel_widgets[channel_name] = channel_widget
+        # Connect signals from global widget
+        self.global_detector_widget.detector_enabled.connect(self.detector_enabled.emit)
+        self.global_detector_widget.detector_parameter_changed.connect(self.detector_parameter_changed.emit)
+        self.global_detector_widget.selection_mode_changed.connect(self.selection_mode_changed.emit)
         
-        layout.addWidget(self.tab_widget)
+        # Wrap in scroll area for long parameter lists
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.global_detector_widget)
+        scroll.setFrameStyle(QFrame.Shape.NoFrame)
+        
+        layout.addWidget(scroll)
+    
+    def _enable_method_for_all(self, method: str):
+        """Enable a specific method for all channels."""
+        if self.global_detector_widget:
+            # Update the checkbox in the UI
+            if method in self.global_detector_widget.detector_widgets:
+                self.global_detector_widget.detector_widgets[method].setChecked(True)
+            # This will trigger the signal emission to all channels
+            self.global_detector_widget._on_detector_enabled(method, True)
     
     def _disable_all_detectors(self):
         """Disable all detectors on all channels."""
-        for method in DetectorFactory.get_available_methods():
-            self.apply_to_all_channels.emit(method, False)
+        if self.global_detector_widget:
+            for method in self.global_detector_widget.detector_widgets:
+                self.global_detector_widget.detector_widgets[method].setChecked(False)
+                self.global_detector_widget._on_detector_enabled(method, False)
     
     def update_channel_config(self, channel_name: str, detector_configs: List[DetectorConfig]):
-        """Update configuration for a specific channel."""
-        if channel_name in self.channel_widgets:
+        """Update global configuration (applies to all channels)."""
+        if self.global_detector_widget:
             for config in detector_configs:
-                self.channel_widgets[channel_name].update_detector_config(config.method, config)
+                self.global_detector_widget.update_detector_config(config.method, config)
     
     def update_selection_mode(self, channel_name: str, mode: str):
-        """Update selection mode for a channel."""
-        if channel_name in self.channel_widgets:
-            self.channel_widgets[channel_name].update_selection_mode(mode)
+        """Update selection mode globally (applies to all channels)."""
+        if self.global_detector_widget:
+            self.global_detector_widget.mode_combo.setCurrentText(mode)
