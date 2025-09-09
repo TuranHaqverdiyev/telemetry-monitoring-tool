@@ -359,6 +359,26 @@ class StreamWorker(QObject):
                         print(f"✅ UDP source added successfully")
                     except Exception as e:
                         print(f"❌ Failed to create UDP stream: {e}")
+                elif t == "simulator":
+                    print(f"🎭 Adding simulator source: {src.get('name', 'simulator')}")
+                    sim_config = src.get("simulator_config", {})
+                    config_channels = sim_config.get("channels", [c.name for c in self.cfg.channels])
+                    rate_hz = sim_config.get("freq_hz", getattr(self.cfg, "rate_hz", 1.0))
+                    
+                    # Strip any source prefix from channel names for simulator (it adds data, prefix gets added later)
+                    sim_channels = []
+                    for ch in config_channels:
+                        if ":" in ch:
+                            # Use the part after the colon (e.g., "sim:temp_c" -> "temp_c")
+                            base_ch = ch.split(":", 1)[1]
+                        else:
+                            base_ch = ch
+                        sim_channels.append(base_ch)
+                    
+                    # Create simulator with base channel names
+                    sim = TelemetrySimulator(channels=sim_channels, rate_hz=rate_hz)
+                    inputs.append((src.get("name", "simulator"), sim.stream()))
+                    print(f"✅ Simulator source added successfully with {len(config_channels)} channels at {rate_hz}Hz")
                 else:
                     print(f"⚠️ Unknown or incomplete source type: {t}")
         else:
@@ -388,6 +408,8 @@ class StreamWorker(QObject):
                     if hasattr(msg, "ts") and hasattr(msg, "values"):
                         ts = float(msg.ts)
                         values = dict(msg.values)
+                        if message_count % 20 == 0:  # Debug raw data
+                            print(f"🔍 Raw data from {name}: ts={ts}, values={values}")
                     elif isinstance(msg, dict):
                         # Robustly parse dict message; skip bad values
                         try:
@@ -424,8 +446,8 @@ class StreamWorker(QObject):
                     else:
                         emit_values = values
                     if not self._paused:
-                        if message_count % 100 == 0:  # Debug every 100th message
-                            print(f"📤 Emitting data: {emit_values}")
+                        if message_count % 10 == 0:  # Debug every 10th message for troubleshooting
+                            print(f"📤 Emitting data: {emit_values} (message #{message_count})")
                         self.reading.emit(ts, emit_values)
                         
                     # Store recent readings for new plot initialization

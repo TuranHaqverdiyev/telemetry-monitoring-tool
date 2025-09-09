@@ -148,8 +148,11 @@ class ChannelDetectorWidget(QWidget):
         mode_layout.addStretch()
         layout.addLayout(mode_layout)
         
-        # Available detection methods
-        available_methods = DetectorFactory.get_available_methods()
+        # Available detection methods (filter to primary names only)
+        all_methods = DetectorFactory.get_available_methods()
+        # Use only primary method names to avoid duplicates from alternative names
+        primary_methods = ["zscore", "iqr", "isolation-forest", "modified-zscore"]
+        available_methods = [m for m in primary_methods if m in all_methods]
         
         for method in available_methods:
             # Create detector group
@@ -208,9 +211,18 @@ class ChannelDetectorWidget(QWidget):
                 "drift_update_rate": 100
             },
             "iqr": {
-                "iqr_multiplier": 1.5,
-                "window_size": 20,
-                "min_samples": 5
+                "iqr_multiplier": 2.0,
+                "window_size": 50,
+                "min_samples": 10
+            },
+            "isolation-forest": {
+                "contamination": 0.1,
+                "n_estimators": 100,
+                "anomaly_threshold": 0.5
+            },
+            "modified-zscore": {
+                "mad_threshold": 3.5,
+                "window_size": 50
             }
         }
         return defaults.get(method, {})

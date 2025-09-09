@@ -18,8 +18,9 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QCheckBox,
     QTabWidget,
+    QSplitter,
 )
-from PySide6.QtCore import QThread, QSettings
+from PySide6.QtCore import QThread, QSettings, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QSystemTrayIcon
 
@@ -29,7 +30,6 @@ from .widgets.plots import PlotGrid
 from .widgets.anomalies import AnomalyTable
 from .widgets.forecasts import ForecastTable
 from .widgets.detector_control import DetectorControlPanel
-from .widgets.detection_results import DetectionResultsPanel
 
 # Optional dark theme
 try:
@@ -54,21 +54,19 @@ class MainWindow(QMainWindow):
         self.cfg = load_config(str(self.cfg_path))
 
         # UI widgets
-        # Start with a single plot panel by default (user can add more later)
-        self.plot = PlotGrid(None, [c.name for c in self.cfg.channels], time_window_sec=self.cfg.window_sec)
-        # Apply threshold overlays from config (by base channel name)
-        thr_map = {c.name: c.breach_threshold for c in self.cfg.channels if getattr(c, 'breach_threshold', None) is not None}
-        if thr_map:
-            self.plot.apply_thresholds(thr_map)
-        # Set initial Z threshold for visual display
-        self.plot.set_z_threshold(float(self.cfg.z_threshold))
-        self.table = AnomalyTable()  # Keep for legacy compatibility
-        self.detection_results = DetectionResultsPanel()  # New enhanced panel
-        self.forecasts = ForecastTable()
+        # No initial plots - user creates them on demand with "Add Plot" button
+        self.plot = None
+        self.plot_container = QWidget()  # Container for plots when created
+        self.plot_layout = QVBoxLayout(self.plot_container)
+        self.plot_layout.addWidget(QLabel("📊 Click '+ Add Plot' to create charts"))
+        
+        self.table = AnomalyTable()  # Enhanced anomaly detection results table
+        # Removed forecasts table - information is included in main results table
         self.status = QLabel("Idle")
         
         # Detector control panel
         channels_config = {ch.name: ch.detectors for ch in self.cfg.channels}
+        # Detector panel now properly configured with channel detection methods
         self.detector_panel = DetectorControlPanel(
             channels_config, 
             getattr(self.cfg, 'detector_selection_mode', 'first')
@@ -91,12 +89,21 @@ class MainWindow(QMainWindow):
         self.chk_notify.setChecked(True)
 
         # System tray for desktop notifications
-        self.tray = QSystemTrayIcon(QIcon(), self)
-        self.tray.setVisible(True)
+        self.tray = QSystemTrayIcon(self)
+        # Create a simple icon from application style
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            # Use a simple application icon or create one
+            icon = self.style().standardIcon(self.style().StandardPixmap.SP_ComputerIcon)
+            self.tray.setIcon(icon)
+            self.tray.setVisible(True)
+        else:
+            # System tray not available, disable notifications
+            self.chk_notify.setEnabled(False)
+            self.chk_notify.setChecked(False)
 
-        # Left side layout
+        # Left side layout - larger space for charts
         self._left_layout = QVBoxLayout()
-        self._left_layout.addWidget(self.plot)
+        self._left_layout.addWidget(self.plot_container)
         self._left_layout.addWidget(self.status)
 
         # Controls panel
@@ -117,7 +124,11 @@ class MainWindow(QMainWindow):
         self.spin_z.setDecimals(2)
         self.spin_z.setRange(0.5, 10.0)
         self.spin_z.setSingleStep(0.1)
-        self.spin_z.setValue(float(self.cfg.z_threshold))
+        # Use a more reasonable default Z threshold (2.5) to allow more anomaly detection
+        z_threshold = float(self.cfg.z_threshold) if hasattr(self.cfg, 'z_threshold') else 2.5
+        if z_threshold > 5.0:  # If config has an unusually high threshold, use 2.5 instead
+            z_threshold = 2.5
+        self.spin_z.setValue(z_threshold)
         ctrl_form.addRow("Z threshold", self.spin_z)
 
         # Right side layout with tabs
@@ -129,7 +140,7 @@ class MainWindow(QMainWindow):
         right.addLayout(ctrl_form)
         right.addWidget(self.chk_group_by_source)
         right.addWidget(self.table)
-        right.addWidget(self.forecasts)
+        # Removed forecasts table - redundant information
         right.addWidget(self.btn_add_plot)
         right.addWidget(self.btn_merge)
         right.addWidget(self.btn_set_log)
@@ -144,14 +155,25 @@ class MainWindow(QMainWindow):
         right.addStretch(1)
         
         right_tabs.addTab(controls_widget, "📊 Controls")
-        right_tabs.addTab(self.detection_results, "🔍 Results")
         right_tabs.addTab(self.detector_panel, "🔧 Detectors")
 
-        central = QWidget()
-        root = QHBoxLayout(central)
-        root.addLayout(self._left_layout, 3)
-        root.addWidget(right_tabs, 2)
-        self.setCentralWidget(central)
+        # Create a horizontal splitter for resizable layout
+        central_splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Create left widget for charts
+        left_widget = QWidget()
+        left_widget.setLayout(self._left_layout)
+        
+        # Add widgets to splitter
+        central_splitter.addWidget(left_widget)
+        central_splitter.addWidget(right_tabs)
+        
+        # Set initial sizes (80% chart, 20% controls) but allow user to resize
+        central_splitter.setSizes([800, 200])  # Initial proportions
+        central_splitter.setStretchFactor(0, 1)  # Chart area can stretch
+        central_splitter.setStretchFactor(1, 0)  # Control panel has fixed minimum
+        
+        self.setCentralWidget(central_splitter)
 
         self._thread = None
         self._worker = None
@@ -180,6 +202,23 @@ class MainWindow(QMainWindow):
         self.detector_panel.detector_parameter_changed.connect(self.on_detector_parameter_changed)
         self.detector_panel.selection_mode_changed.connect(self.on_selection_mode_changed)
         self.detector_panel.apply_to_all_channels.connect(self.on_apply_to_all_channels)
+
+    def _create_initial_plot(self) -> None:
+        """Create the initial empty plot grid when user first adds a plot."""
+        from .widgets.plots import PlotGrid  # Import here to avoid circular imports
+        
+        # Clear the placeholder
+        for i in reversed(range(self.plot_layout.count())):
+            self.plot_layout.itemAt(i).widget().setParent(None)
+            
+        # Create EMPTY plot grid - no default panels
+        self.plot = PlotGrid(None, [], time_window_sec=self.cfg.window_sec)
+        
+        # Set Z threshold for visual display
+        self.plot.set_z_threshold(float(self.cfg.z_threshold))
+        
+        # Add plot to layout
+        self.plot_layout.addWidget(self.plot)
 
     def start_stream(self) -> None:
         if self._worker:
@@ -236,11 +275,13 @@ class MainWindow(QMainWindow):
             self.spin_z.setValue(float(self.cfg.z_threshold))
 
     def on_reading(self, ts: float, values: dict) -> None:
-        self.plot.append(ts, values)
+        if self.plot:  # Only append if plot exists
+            self.plot.append(ts, values)
 
     def on_channel_stats(self, channel: str, mean: float, std: float) -> None:
         """Update plot Z-score threshold lines based on channel statistics."""
-        self.plot.update_channel_stats(channel, mean, std)
+        if self.plot:  # Only update if plot exists
+            self.plot.update_channel_stats(channel, mean, std)
 
     def on_anomaly(self, ev: AnomalyEvent) -> None:
         # ev may be a dataclass or a dict with extra fields
@@ -259,9 +300,6 @@ class MainWindow(QMainWindow):
                     float(pvalue) if pvalue is not None else 0.0,
                     float(eta_sec) if eta_sec is not None else 0.0,
                 )
-                
-                # Enhanced detection results panel
-                self.detection_results.add_anomaly(ev)
                 
                 # Desktop notification for critical severity
                 try:
@@ -293,7 +331,6 @@ class MainWindow(QMainWindow):
                     "anomaly_score": min(abs(ev.z) / 3.0, 1.0),  # Normalize Z-score
                     "explanation_summary": f"Z-score anomaly detected: {ev.z:.2f}"
                 }
-                self.detection_results.add_anomaly(legacy_dict)
         except Exception:
             # fallback minimal
             try:
@@ -309,7 +346,7 @@ class MainWindow(QMainWindow):
             else:
                 self.status.setStyleSheet("")
             self.status.setText(msg)
-            self.forecasts.upsert(channel, threshold, eta_sec)
+            # Forecast data is now included in the main results table via ETA column
         else:
             msg = f"Forecast: {channel} - no trend toward {threshold}"
             self.status.setStyleSheet("")
@@ -319,7 +356,8 @@ class MainWindow(QMainWindow):
 
     # Control handlers
     def on_window_changed(self, v: int) -> None:
-        self.plot.set_time_window(int(v))
+        if self.plot:
+            self.plot.set_time_window(int(v))
         if self._worker:
             self._worker.set_window_sec(int(v))
 
@@ -331,7 +369,8 @@ class MainWindow(QMainWindow):
         if self._worker:
             self._worker.set_z_threshold(float(v))
             # Update visual Z-score threshold lines on all plots
-            self.plot.set_z_threshold(float(v))
+            if self.plot:
+                self.plot.set_z_threshold(float(v))
             # Provide visual feedback that threshold was updated
             self.status.setText(f"Z threshold updated to {v:.2f}")
             # Reset status back to normal after 3 seconds
@@ -364,8 +403,13 @@ class MainWindow(QMainWindow):
         """Factory method that creates plots with proper data binding and historical data"""
         print(f"Creating new plot panel '{name}' with channels: {channels}")
         
+        # Create initial plot if it doesn't exist
+        if not self.plot:
+            self._create_initial_plot()
+        
         # Add the panel to the grid
-        self.plot.add_panel(name, channels)
+        if self.plot:
+            self.plot.add_panel(name, channels)
         
         # If we have an active worker with historical data, populate the new panel
         if self._worker and hasattr(self._worker, 'get_historical_data'):
@@ -373,7 +417,7 @@ class MainWindow(QMainWindow):
                 historical_data = self._worker.get_historical_data(channels)
                 print(f"Retrieved {len(historical_data)} historical data points for new panel")
                 
-                panel = self.plot._panel_by_name.get(name)
+                panel = self.plot._panel_by_name.get(name) if self.plot else None
                 if panel and historical_data:
                     for ts, values in historical_data:
                         filtered_values = {k: v for k, v in values.items() 
@@ -391,7 +435,7 @@ class MainWindow(QMainWindow):
         # Apply any existing thresholds for the channels
         thr_map = {c.name: c.breach_threshold for c in self.cfg.channels 
                   if getattr(c, 'breach_threshold', None) is not None and c.name in channels}
-        if thr_map:
+        if thr_map and self.plot:
             panel = self.plot._panel_by_name.get(name)
             if panel:
                 for ch, threshold in thr_map.items():
@@ -411,7 +455,8 @@ class MainWindow(QMainWindow):
         chans = [c.strip() for c in chans_csv.split(',') if c.strip()]
         if not chans:
             return
-        self.plot.merge_channels(target, chans)
+        if self.plot:
+            self.plot.merge_channels(target, chans)
 
     def closeEvent(self, event):  # type: ignore[override]
         try:
@@ -450,7 +495,11 @@ class MainWindow(QMainWindow):
         z = self._settings.value("z")
         if z is not None:
             try:
-                self.spin_z.setValue(float(z))
+                z_val = float(z)
+                # If saved Z threshold is too high, use a reasonable default instead
+                if z_val > 5.0:
+                    z_val = 2.5
+                self.spin_z.setValue(z_val)
             except Exception:
                 pass
         g = self._settings.value("group_by_source")
@@ -473,8 +522,9 @@ class MainWindow(QMainWindow):
     def on_clear(self) -> None:
         try:
             self.table.table.setRowCount(0)
-            self.forecasts.clear_rows()
-            self.plot.clear()
+            # Forecast data is now included in main table
+            if self.plot:
+                self.plot.clear()
         except Exception:
             pass
 
@@ -541,7 +591,11 @@ class MainWindow(QMainWindow):
         try:
             from datetime import datetime
             from pathlib import Path
-            pix = self.plot.grab()
+            if self.plot:
+                pix = self.plot.grab()
+            else:
+                # If no plot exists, take screenshot of the container
+                pix = self.plot_container.grab()
             out_dir = Path("snapshots")
             out_dir.mkdir(parents=True, exist_ok=True)
             fname = out_dir / f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"

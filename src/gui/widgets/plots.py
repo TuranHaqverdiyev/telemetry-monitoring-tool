@@ -140,9 +140,12 @@ class PlotGrid(QWidget):
 
         if groups:
             items = list(groups.items())
-        else:
+        elif all_channels:
             # Single panel with all channels by default
             items = [("All", list(all_channels))]
+        else:
+            # No channels provided, create empty grid
+            items = []
 
         self._panels = []
         self._panel_by_name: Dict[str, MultiChannelPlot] = {}

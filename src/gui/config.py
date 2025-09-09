@@ -73,7 +73,7 @@ def load_config(path: str) -> AppConfig:
     chans: List[ChannelConfig] = []
     groups: Dict[str, List[str]] = {}
     
-    # Handle new config structure with data_sources
+    # Handle config structure - check both data_sources and top-level channels
     if "data_sources" in data:
         for source in data["data_sources"]:
             for c in source.get("channels", []):
@@ -98,7 +98,39 @@ def load_config(path: str) -> AppConfig:
                 )
                 if grp:
                     groups.setdefault(grp, []).append(c["name"])
-    else:
+    
+    # Also check for top-level channels (new hybrid format)
+    if "channels" in data:
+        for c in data.get("channels", []):
+            # Check if this channel was already added from data_sources
+            if any(ch.name == c.get("name") for ch in chans):
+                continue
+                
+            b = c.get("breach", c.get("forecast_threshold", {}))
+            grp = c.get("group")
+            
+            # Load channel-specific detectors or use defaults
+            channel_detectors = _load_detectors_config(c.get("detectors", []))
+            if not channel_detectors:
+                channel_detectors = default_detectors.copy()
+            
+            chans.append(
+                ChannelConfig(
+                    name=c["name"],
+                    unit=c.get("unit", ""),
+                    min=c.get("min"),
+                    max=c.get("max"),
+                    breach_direction=b.get("direction"),
+                    breach_threshold=b.get("threshold", b.get("value")),
+                    group=grp,
+                    detectors=channel_detectors
+                )
+            )
+            if grp:
+                groups.setdefault(grp, []).append(c["name"])
+    
+    # Fallback to old config structure if no channels found yet
+    if not chans and "channels" not in data:
         # Handle old config structure
         for c in data.get("channels", []):
             b = c.get("breach") or {}
