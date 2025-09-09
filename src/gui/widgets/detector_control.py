@@ -46,11 +46,15 @@ class DetectorParameterWidget(QWidget):
     def _create_parameter_widget(self, param_name: str, value: Any) -> Optional[QWidget]:
         """Create appropriate widget for parameter type."""
         
-        if param_name in ["window_size", "min_samples", "learning_period", "drift_update_rate"]:
+        if param_name in ["window_size", "min_samples", "learning_period", "drift_update_rate", "n_estimators"]:
             # Integer parameters
             spinbox = QSpinBox()
-            spinbox.setRange(1, 10000)
-            spinbox.setValue(int(value))
+            if param_name == "n_estimators":
+                spinbox.setRange(10, 1000)
+                spinbox.setValue(int(value))
+            else:
+                spinbox.setRange(1, 10000)
+                spinbox.setValue(int(value))
             spinbox.valueChanged.connect(
                 lambda v, name=param_name: self.parameter_changed.emit(self.method, name, v)
             )
@@ -65,9 +69,13 @@ class DetectorParameterWidget(QWidget):
             if param_name in ["alpha"]:
                 spinbox.setRange(0.001, 1.0)
                 spinbox.setSingleStep(0.005)
-            elif param_name in ["z_threshold", "iqr_multiplier"]:
+            elif param_name in ["z_threshold", "iqr_multiplier", "mad_threshold"]:
                 spinbox.setRange(0.1, 10.0)
                 spinbox.setSingleStep(0.1)
+            elif param_name in ["contamination", "anomaly_threshold"]:
+                spinbox.setRange(0.001, 0.5)
+                spinbox.setSingleStep(0.01)
+                spinbox.setDecimals(3)
             elif param_name in ["eps"]:
                 spinbox.setRange(1e-10, 1e-3)
                 spinbox.setSingleStep(1e-7)
