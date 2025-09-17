@@ -4,8 +4,6 @@ Isolation Forest Anomaly Detector
 Machine learning-based anomaly detection using the Isolation Forest algorithm.
 Particularly effective for multivariate anomalies and complex patterns that
 traditional statistical methods might miss.
-
-Author: GitHub Copilot
 """
 
 import logging
