@@ -3,6 +3,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Ensure project 'src' root is on sys.path when launched as a module
+# e.g., `python -m src.gui.main` from repo root.
+_this_file = Path(__file__).resolve()
+# Parent[1] is the 'src' directory when file is .../src/gui/main.py
+_src_dir = _this_file.parents[1]
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
