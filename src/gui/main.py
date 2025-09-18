@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
         self.btn_clear = QPushButton("Clear")
         self.btn_load = QPushButton("Load Config…")
         self.btn_add_plot = QPushButton("+ Add Plot")
-        self.btn_merge = QPushButton("Merge Channels")
+        self.btn_remove_plot = QPushButton("Remove Chart")
         self.btn_set_log = QPushButton("Set Log CSV…")
         self.btn_snapshot = QPushButton("Save Snapshot…")
         self.chk_group_by_source = QCheckBox("Group by Source")
@@ -170,7 +170,7 @@ class MainWindow(QMainWindow):
         right.addWidget(self.table)
         # Removed forecasts table - redundant information
         right.addWidget(self.btn_add_plot)
-        right.addWidget(self.btn_merge)
+        right.addWidget(self.btn_remove_plot)
         right.addWidget(self.btn_set_log)
         right.addWidget(self.btn_snapshot)
         right.addWidget(self.chk_notify)
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self.stop_stream)
         self.btn_load.clicked.connect(self.load_config_dialog)
         self.btn_add_plot.clicked.connect(self.add_plot_dialog)
-        self.btn_merge.clicked.connect(self.merge_channels_dialog)
+        self.btn_remove_plot.clicked.connect(self.remove_panel_dialog)
         self.btn_set_log.clicked.connect(self.set_log_csv)
         self.chk_group_by_source.toggled.connect(self.on_group_by_source)
         self.btn_snapshot.clicked.connect(self.on_snapshot)
@@ -295,8 +295,11 @@ class MainWindow(QMainWindow):
             if thr_map:
                 new_plot.apply_thresholds(thr_map)
             # Replace widget in the left column
-            self._left_layout.replaceWidget(self.plot, new_plot)
-            self.plot.setParent(None)
+            if self.plot is not None:
+                self._left_layout.replaceWidget(self.plot, new_plot)
+                self.plot.setParent(None)
+            else:
+                self._left_layout.addWidget(new_plot)
             self.plot = new_plot
             # Update control defaults
             self.spin_window.setValue(int(self.cfg.window_sec))
@@ -490,18 +493,20 @@ class MainWindow(QMainWindow):
         
         print(f"Successfully created plot panel '{name}'")
 
-    def merge_channels_dialog(self) -> None:
-        target, ok = QInputDialog.getText(self, "Merge Channels", "Target panel name:")
-        if not ok or not target:
+    def remove_panel_dialog(self) -> None:
+        if not self.plot:
             return
-        chans_csv, ok = QInputDialog.getText(self, "Merge Channels", "Channels to add (comma-separated):")
-        if not ok:
+        # Get existing panel names
+        names = self.plot.get_panel_names()
+        if not names:
             return
-        chans = [c.strip() for c in chans_csv.split(',') if c.strip()]
-        if not chans:
+        # Ask user for panel name to remove
+        name, ok = QInputDialog.getText(self, "Remove Chart", f"Panel name to remove (existing: {', '.join(names)}):")
+        if not ok or not name:
             return
-        if self.plot:
-            self.plot.merge_channels(target, chans)
+        if name not in names:
+            return
+        self.plot.remove_panel(name)
 
     def closeEvent(self, event):  # type: ignore[override]
         try:

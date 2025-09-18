@@ -214,15 +214,49 @@ class PlotGrid(QWidget):
             if ch in self._thresholds:
                 panel.set_threshold(ch, float(self._thresholds[ch]))
 
-    def merge_channels(self, panel_name: str, channels: Sequence[str]) -> None:
-        panel = self._panel_by_name.get(panel_name)
+    def get_panel_names(self) -> List[str]:
+        """Return the list of current panel names."""
+        return list(self._panel_by_name.keys())
+
+    def remove_panel(self, name: str) -> None:
+        """Remove a panel by name and reflow the grid layout."""
+        panel = self._panel_by_name.pop(name, None)
         if not panel:
             return
-        for ch in channels:
-            panel.add_channel(ch)
-            self._panel_channels.setdefault(panel_name, set()).add(ch)
-            if ch in self._thresholds:
-                panel.set_threshold(ch, float(self._thresholds[ch]))
+        # Remove bookkeeping
+        if name in self._panel_channels:
+            del self._panel_channels[name]
+        # Remove index entry
+        self._index = [(n, chs) for (n, chs) in self._index if n != name]
+        # Remove widget from layout and delete it
+        try:
+            panel.setParent(None)
+            panel.deleteLater()
+        except Exception:
+            pass
+        try:
+            # Remove from internal list
+            self._panels = [p for p in self._panels if p is not panel]
+        except Exception:
+            pass
+        # Reflow remaining widgets
+        self._reflow_layout()
+
+    def _reflow_layout(self) -> None:
+        """Clear and re-add remaining panels to maintain a compact grid."""
+        # Remove all items from layout (widgets remain alive)
+        for i in reversed(range(self._layout.count())):
+            item = self._layout.itemAt(i)
+            w = item.widget()
+            if w is not None:
+                self._layout.removeWidget(w)
+        # Re-add in 2-column grid
+        for idx, (name, _) in enumerate(self._index):
+            panel = self._panel_by_name.get(name)
+            if not panel:
+                continue
+            r, c = divmod(idx, 2)
+            self._layout.addWidget(panel, r, c)
 
     def apply_thresholds(self, thr_map: Dict[str, float]) -> None:
         """Apply thresholds by base-channel across all panels."""

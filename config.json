@@ -228,16 +228,20 @@
       "critical": [
         "demo.turanrh@gmail.com",
         "test-gui-sync@example.com",
-        "new-user@example.com"
+        "new-user@example.com",
+        "ee816708@gmail.com"
       ],
       "high": [
-        "demo.turanrh@gmail.com"
+        "demo.turanrh@gmail.com",
+        "ee816708@gmail.com"
       ],
       "medium": [
-        "demo.turanrh@gmail.com"
+        "demo.turanrh@gmail.com",
+        "ee816708@gmail.com"
       ],
       "low": [
-        "demo.turanrh@gmail.com"
+        "demo.turanrh@gmail.com",
+        "ee816708@gmail.com"
       ]
     },
     "rate_limiting": {
